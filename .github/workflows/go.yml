@@ -41,7 +41,7 @@ jobs:
 
       - name: 编译 Go 程序
         run: |
-          go build -o $OUTPUT_NAME cmd/PassiveCheck/PassiveCheck.go
+          go build -o $OUTPUT_NAME quake.go
           ls -lah
 
       - name: 上传构建产物
