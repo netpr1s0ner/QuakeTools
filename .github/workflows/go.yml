@@ -1,4 +1,4 @@
-name: Build and Release PassiveCheck
+name: Build and Release QuakeTools
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
       - name: 处理 Windows 可执行文件名
         shell: bash
         run: |
-          output_name="PassiveCheck-${{ matrix.goos }}-${{ matrix.goarch }}"
+          output_name="QuakeTools-${{ matrix.goos }}-${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" == "windows" ]; then
             output_name="${output_name}.exe"
           fi
@@ -47,7 +47,7 @@ jobs:
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
-          name: PassiveCheck-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: QuakeTools-${{ matrix.goos }}-${{ matrix.goarch }}
           path: ${{ env.OUTPUT_NAME }}
 
   release:
@@ -81,7 +81,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: artifacts/**/*
-          body: "自动发布的 PassiveCheck 版本 🚀"
+          body: "自动发布的 QuakeTools 版本 🚀"
           draft: false
           prerelease: false
         env:
