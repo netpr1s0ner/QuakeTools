@@ -1,28 +1,88 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go
+name: Build and Release PassiveCheck
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+    tags:
+      - "v*"  # 仅在 tag push 时触发，例如 v1.0.0
+  workflow_dispatch:  # 允许手动触发工作流
 
 jobs:
-
   build:
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.goos }}-${{ matrix.goarch }})
+    runs-on: ubuntu-latest  # 使用 Ubuntu 运行环境
+
+    strategy:
+      matrix:
+        goos: [windows, linux, darwin]
+        goarch: [amd64, arm64]
+
     steps:
-    - uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.20'
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.20"  # 这里使用 Go 1.20
 
-    - name: Build
-      run: go build -v ./...
+      - name: 设置 Go 交叉编译环境变量
+        run: |
+          echo "GOOS=${{ matrix.goos }}" >> $GITHUB_ENV
+          echo "GOARCH=${{ matrix.goarch }}" >> $GITHUB_ENV
 
-    - name: Test
-      run: go test -v ./...
+      - name: 处理 Windows 可执行文件名
+        shell: bash
+        run: |
+          output_name="PassiveCheck-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            output_name="${output_name}.exe"
+          fi
+          echo "OUTPUT_NAME=${output_name}" >> $GITHUB_ENV
+
+      - name: 编译 Go 程序
+        run: |
+          go build -o $OUTPUT_NAME cmd/PassiveCheck/PassiveCheck.go
+          ls -lah
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: PassiveCheck-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: ${{ env.OUTPUT_NAME }}
+
+  release:
+    name: Release on GitHub
+    needs: build  # 确保 build 任务完成后才执行
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 显示下载的文件
+        run: ls -lah artifacts
+
+      - name: 检出代码
+        uses: actions/checkout@v4  # 确保当前步骤有完整的 Git 仓库上下文
+
+      - name: 获取最新标签
+        run: |
+          TAG_NAME="${GITHUB_REF##*/}"  # 从 GITHUB_REF 提取标签名，例如 refs/tags/v1.0.0
+          echo "TAG_NAME=${TAG_NAME}" >> $GITHUB_ENV
+
+      - name: 创建新的 Git 标签并推送
+        run: |
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
+
+      - name: 发布到 GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          body: "自动发布的 PassiveCheck 版本 🚀"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
